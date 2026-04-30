@@ -1,0 +1,147 @@
+name: Verificar Disponibilidade SESC
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Roda a cada hora
+  workflow_dispatch:       # Permite rodar manualmente
+
+jobs:
+  check-availability:
+    name: Consultar Disponibilidade
+    runs-on: ubuntu-latest
+
+    env:
+      API_URL: "https://portalturismoapi.sescgo.com.br/api/v1/reservas/disponibilidade/2026-12-01/2026-12-07/1,1,/null/N/1/1/%7B%7D/%7B%7D"
+      QUERY_PARAMS: "SescUnidade=1&ReservaId=0&regimepensao=CAJ"
+
+    steps:
+      - name: Chamar API de Disponibilidade
+        id: api_call
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            "${API_URL}?${QUERY_PARAMS}" \
+            -H "accept: application/json, text/javascript, */*; q=0.01" \
+            -H "accept-language: pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7" \
+            -H "Referer: https://portalturismo.sescgo.com.br/")
+
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "http_status=$HTTP_STATUS" >> $GITHUB_OUTPUT
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "=== STATUS HTTP: $HTTP_STATUS ==="
+          echo "=== BODY ==="
+          echo "$BODY" | python3 -m json.tool 2>/dev/null || echo "$BODY"
+
+      - name: Validar Resposta
+        id: validate
+        run: |
+          HTTP_STATUS="${{ steps.api_call.outputs.http_status }}"
+          BODY='${{ steps.api_call.outputs.body }}'
+
+          STATUS_EMOJI="✅"
+          STATUS_MSG="Consulta realizada com sucesso"
+          DISPONIBILIDADE=""
+          EXIT_CODE=0
+
+          # Valida status HTTP
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            STATUS_EMOJI="❌"
+            STATUS_MSG="Erro na requisição — Status HTTP: $HTTP_STATUS"
+            EXIT_CODE=1
+          else
+            # Valida se é JSON válido
+            echo "$BODY" | python3 -m json.tool > /dev/null 2>&1
+            if [ $? -ne 0 ]; then
+              STATUS_EMOJI="❌"
+              STATUS_MSG="Resposta não é um JSON válido"
+              EXIT_CODE=1
+            else
+              # Verifica disponibilidade
+              HAS_ITEMS=$(echo "$BODY" | python3 -c "
+          import sys, json
+          try:
+              d = json.load(sys.stdin)
+              items = d.get('data', d.get('items', d.get('result', [])))
+              count = len(items) if isinstance(items, list) else 'N/A'
+              print(count)
+          except:
+              print('N/A')
+          " 2>/dev/null)
+
+              if [ "$HAS_ITEMS" = "0" ]; then
+                DISPONIBILIDADE="⚠️ Nenhuma disponibilidade encontrada"
+              elif [ "$HAS_ITEMS" != "N/A" ]; then
+                DISPONIBILIDADE="🛏️ Disponibilidade encontrada: $HAS_ITEMS item(s)"
+              else
+                DISPONIBILIDADE="ℹ️ Dados retornados (verifique a estrutura do JSON)"
+              fi
+            fi
+          fi
+
+          echo "status_emoji=$STATUS_EMOJI"       >> $GITHUB_OUTPUT
+          echo "status_msg=$STATUS_MSG"           >> $GITHUB_OUTPUT
+          echo "disponibilidade=$DISPONIBILIDADE" >> $GITHUB_OUTPUT
+
+          exit $EXIT_CODE
+
+      - name: Notificar Telegram — Sucesso
+        if: success()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          TIMESTAMP=$(TZ="America/Sao_Paulo" date '+%d/%m/%Y %H:%M:%S')
+          MESSAGE="✅ *SESC — Consulta OK*
+
+🗓️ Período: 01/12/2026 → 07/12/2026
+🏨 Unidade: 1 \| Regime: CAJ
+📡 Status HTTP: ${{ steps.api_call.outputs.http_status }}
+${{ steps.validate.outputs.disponibilidade }}
+
+⏰ $TIMESTAMP (Brasília)
+🔗 [Ver no GitHub Actions](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${MESSAGE}" \
+            --data-urlencode "parse_mode=Markdown"
+
+      - name: Notificar Telegram — Erro
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          TIMESTAMP=$(TZ="America/Sao_Paulo" date '+%d/%m/%Y %H:%M:%S')
+          MESSAGE="❌ *SESC — Falha na Consulta*
+
+🗓️ Período: 01/12/2026 → 07/12/2026
+🏨 Unidade: 1 \| Regime: CAJ
+📡 Status HTTP: ${{ steps.api_call.outputs.http_status }}
+⚠️ ${{ steps.validate.outputs.status_msg }}
+
+⏰ $TIMESTAMP (Brasília)
+🔗 [Ver detalhes](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${MESSAGE}" \
+            --data-urlencode "parse_mode=Markdown"
+
+      - name: Resumo do Job
+        if: always()
+        run: |
+          echo "## 📋 Resumo da Verificação" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Campo | Valor |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🗓️ Período | 01/12/2026 → 07/12/2026 |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🏨 Unidade SESC | 1 |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🍽️ Regime | CAJ |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📡 Status HTTP | ${{ steps.api_call.outputs.http_status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ${{ steps.validate.outputs.status_emoji }} Status | ${{ steps.validate.outputs.status_msg }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏰ Executado em | $(TZ='America/Sao_Paulo' date '+%d/%m/%Y %H:%M:%S') (Brasília) |" >> $GITHUB_STEP_SUMMARY
