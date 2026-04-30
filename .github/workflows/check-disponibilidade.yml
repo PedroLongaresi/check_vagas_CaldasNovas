@@ -11,8 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      API_URL: "https://portalturismoapi.sescgo.com.br/api/v1/reservas/disponibilidade/2026-12-01/2026-12-07/1,1,/null/N/1/1/%7B%7D/%7B%7D"
-      QUERY_PARAMS: "SescUnidade=1&ReservaId=0&regimepensao=CAJ"
+      # API_URL: "https://portalturismoapi.sescgo.com.br/api/v1/reservas/disponibilidade/2026-12-01/2026-12-07/1,1,/null/N/1/1/%7B%7D/%7B%7D"
+      API_URL: "https://portalturismoapi.sescgo.com.br/api/v1/reservas/disponibilidade/2026-08-09/2026-08-15/1,1,/null/N/2/1/%7B%7D/%7B%7D?SescUnidade=2&ReservaId=0&regimepensao=CAJ"
+      QUERY_PARAMS: "SescUnidade=2&ReservaId=0&regimepensao=CAJ"
+      # QUERY_PARAMS: "SescUnidade=1&ReservaId=0&regimepensao=CAJ"
 
     steps:
       - name: Chamar API de Disponibilidade
@@ -126,8 +128,10 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           TIMESTAMP=$(TZ="America/Sao_Paulo" date '+%d/%m/%Y %H:%M:%S')
-          MESSAGE=$(printf "❌ *SESC — Falha na Consulta*\n\n🗓️ Período: 01/12/2026 → 07/12/2026\n🏨 Unidade: 1 | Regime: CAJ\n📡 Status HTTP: %s\n⚠️ %s\n\n⏰ %s (Brasília)\n🔗 [Ver detalhes](%s)" \
-            "$HTTP_STATUS" "$STATUS_MSG" "$TIMESTAMP" "$RUN_URL")
+          MESSAGE=$(printf "❌ *SESC — Falha na Consulta*\n\n🗓️ Período: 01/12/2026 → 07/12/2026
+          🏨 Unidade: 1  
+          Regime: CAJ\n📡 Status HTTP: %s\n⚠️ %s\n\n⏰ %s (Brasília)\n🔗 [Ver detalhes](%s)" \
+            "$HTTP_STATUS" "$STATUS_MSG" "$TIMESTAMP" )
 
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
