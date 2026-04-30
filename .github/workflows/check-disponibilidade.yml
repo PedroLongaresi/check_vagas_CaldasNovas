@@ -71,7 +71,7 @@ jobs:
               elif [ "$HAS_AVAIL" = "true" ]; then
                 DISPONIBILIDADE="🛏️ Vagas disponíveis encontradas"
               else
-                DISPONIBILIDADE="⚠️ Nenhuma disponibilidade encontrada"
+                DISPONIBILIDADE="$HAS_AVAIL ⚠️ Nenhuma disponibilidade encontrada"
               fi
             fi
           fi
