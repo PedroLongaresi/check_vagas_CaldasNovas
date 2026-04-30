@@ -68,13 +68,13 @@ jobs:
               if [ "$HAS_MSG" = "true" ]; then
                 DISPONIBILIDADE="📅 Período ainda não liberado para venda"
                 PERIODO_LIBERADO=false
-              elif [ "$HAS_AVAIL" = "true" ]; then
+              elif [ "$HAS_AVAIL" = "True" ]; then
                 DISPONIBILIDADE="🛏️ Vagas disponíveis encontradas"
               else
                 DISPONIBILIDADE="$HAS_AVAIL ⚠️ Nenhuma disponibilidade encontrada"
               fi
             fi
-          fi
+          fi'
 
           echo "status_emoji=$STATUS_EMOJI"       >> $GITHUB_OUTPUT
           echo "status_msg=$STATUS_MSG"           >> $GITHUB_OUTPUT
