@@ -36,13 +36,15 @@ jobs:
             echo "tem_vaga=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Enviar Notificação via Telegram
+      - name: Enviar Notificação via Telegram (Com Vagas)
         if: steps.validar_vagas.outputs.tem_vaga == 'true'
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
             -d text=" ✅ 🚨 ✅  EXISTEM VAGAS DISPONÍVEIS NO SESC! Acesse o sistema para realizar a reserva."
-        else:
+
+      - name: Enviar Notificação via Telegram (Sem Vagas)
+        if: steps.validar_vagas.outputs.tem_vaga == 'false'
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
