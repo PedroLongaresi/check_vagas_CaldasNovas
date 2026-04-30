@@ -2,7 +2,7 @@ name: Verificar Disponibilidade SESC
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Roda a cada hora
+    - cron: '0 11,15,19 * * *'  # Roda às 08:00, 12:00 e 16:00 Brasília (UTC-3)
   workflow_dispatch:       # Permite rodar manualmente
 
 jobs:
@@ -76,12 +76,19 @@ jobs:
               else
                 DISPONIBILIDADE="ℹ️ Dados retornados (verifique a estrutura do JSON)"
               fi
+
+              PERIODO_LIBERADO=true
+              if echo "$BODY" | grep -q "Período ainda não liberado para venda"; then
+                PERIODO_LIBERADO=false
+                DISPONIBILIDADE="📅 Período ainda não liberado para venda"
+              fi
             fi
           fi
 
           echo "status_emoji=$STATUS_EMOJI"       >> $GITHUB_OUTPUT
           echo "status_msg=$STATUS_MSG"           >> $GITHUB_OUTPUT
           echo "disponibilidade=$DISPONIBILIDADE" >> $GITHUB_OUTPUT
+          echo "periodo_liberado=$PERIODO_LIBERADO" >> $GITHUB_OUTPUT
 
           exit $EXIT_CODE
 
@@ -92,11 +99,17 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           HTTP_STATUS: ${{ steps.api_call.outputs.http_status }}
           DISPONIBILIDADE: ${{ steps.validate.outputs.disponibilidade }}
+          PERIODO_LIBERADO: ${{ steps.validate.outputs.periodo_liberado }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           TIMESTAMP=$(TZ="America/Sao_Paulo" date '+%d/%m/%Y %H:%M:%S')
-          MESSAGE=$(printf "✅ *SESC — Consulta OK*\n\n🗓️ Período: 01/12/2026 → 07/12/2026\n🏨 Unidade: 1 | Regime: CAJ\n📡 Status HTTP: %s\n%s\n\n⏰ %s (Brasília)\n🔗 [Ver no GitHub Actions](%s)" \
-            "$HTTP_STATUS" "$DISPONIBILIDADE" "$TIMESTAMP" "$RUN_URL")
+
+          if [ "$PERIODO_LIBERADO" = "false" ]; then
+            MESSAGE="📅 *SESC — Período ainda não liberado*\n\n🗓️ Período: 01/12/2026 → 07/12/2026\n🏨 Unidade: 1 | Regime: CAJ\n\n⏰ $TIMESTAMP (Brasília)\n🔗 [Ver no GitHub Actions]($RUN_URL)"
+          else
+            MESSAGE=$(printf "✅ *SESC — Consulta OK*\n\n🗓️ Período: 01/12/2026 → 07/12/2026\n🏨 Unidade: 1 | Regime: CAJ\n📡 Status HTTP: %s\n%s\n\n⏰ %s (Brasília)\n🔗 [Ver no GitHub Actions](%s)" \
+              "$HTTP_STATUS" "$DISPONIBILIDADE" "$TIMESTAMP" "$RUN_URL")
+          fi
 
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
@@ -133,4 +146,5 @@ jobs:
           echo "| 🍽️ Regime | CAJ |" >> $GITHUB_STEP_SUMMARY
           echo "| 📡 Status HTTP | ${{ steps.api_call.outputs.http_status }} |" >> $GITHUB_STEP_SUMMARY
           echo "| ${{ steps.validate.outputs.status_emoji }} Status | ${{ steps.validate.outputs.status_msg }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📅 Período Liberado | ${{ steps.validate.outputs.periodo_liberado }} |" >> $GITHUB_STEP_SUMMARY
           echo "| ⏰ Executado em | $(TZ='America/Sao_Paulo' date '+%d/%m/%Y %H:%M:%S') (Brasília) |" >> $GITHUB_STEP_SUMMARY
