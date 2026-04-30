@@ -47,20 +47,17 @@ jobs:
           DISPONIBILIDADE=""
           EXIT_CODE=0
 
-          # Valida status HTTP
           if [ "$HTTP_STATUS" -ne 200 ]; then
             STATUS_EMOJI="❌"
             STATUS_MSG="Erro na requisição — Status HTTP: $HTTP_STATUS"
             EXIT_CODE=1
           else
-            # Valida se é JSON válido
             echo "$BODY" | python3 -m json.tool > /dev/null 2>&1
             if [ $? -ne 0 ]; then
               STATUS_EMOJI="❌"
               STATUS_MSG="Resposta não é um JSON válido"
               EXIT_CODE=1
             else
-              # Verifica disponibilidade
               HAS_ITEMS=$(echo "$BODY" | python3 -c "
           import sys, json
           try:
@@ -88,44 +85,36 @@ jobs:
 
           exit $EXIT_CODE
 
-      - name: Notificar Telegram — Sucesso
+      - name: Notificar Telegram - Sucesso
         if: success()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          HTTP_STATUS: ${{ steps.api_call.outputs.http_status }}
+          DISPONIBILIDADE: ${{ steps.validate.outputs.disponibilidade }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           TIMESTAMP=$(TZ="America/Sao_Paulo" date '+%d/%m/%Y %H:%M:%S')
-          MESSAGE="✅ *SESC — Consulta OK*
-
-🗓️ Período: 01/12/2026 → 07/12/2026
-🏨 Unidade: 1 \| Regime: CAJ
-📡 Status HTTP: ${{ steps.api_call.outputs.http_status }}
-${{ steps.validate.outputs.disponibilidade }}
-
-⏰ $TIMESTAMP (Brasília)
-🔗 [Ver no GitHub Actions](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          MESSAGE=$(printf "✅ *SESC — Consulta OK*\n\n🗓️ Período: 01/12/2026 → 07/12/2026\n🏨 Unidade: 1 | Regime: CAJ\n📡 Status HTTP: %s\n%s\n\n⏰ %s (Brasília)\n🔗 [Ver no GitHub Actions](%s)" \
+            "$HTTP_STATUS" "$DISPONIBILIDADE" "$TIMESTAMP" "$RUN_URL")
 
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
             --data-urlencode "text=${MESSAGE}" \
             --data-urlencode "parse_mode=Markdown"
 
-      - name: Notificar Telegram — Erro
+      - name: Notificar Telegram - Erro
         if: failure()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          HTTP_STATUS: ${{ steps.api_call.outputs.http_status }}
+          STATUS_MSG: ${{ steps.validate.outputs.status_msg }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           TIMESTAMP=$(TZ="America/Sao_Paulo" date '+%d/%m/%Y %H:%M:%S')
-          MESSAGE="❌ *SESC — Falha na Consulta*
-
-🗓️ Período: 01/12/2026 → 07/12/2026
-🏨 Unidade: 1 \| Regime: CAJ
-📡 Status HTTP: ${{ steps.api_call.outputs.http_status }}
-⚠️ ${{ steps.validate.outputs.status_msg }}
-
-⏰ $TIMESTAMP (Brasília)
-🔗 [Ver detalhes](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          MESSAGE=$(printf "❌ *SESC — Falha na Consulta*\n\n🗓️ Período: 01/12/2026 → 07/12/2026\n🏨 Unidade: 1 | Regime: CAJ\n📡 Status HTTP: %s\n⚠️ %s\n\n⏰ %s (Brasília)\n🔗 [Ver detalhes](%s)" \
+            "$HTTP_STATUS" "$STATUS_MSG" "$TIMESTAMP" "$RUN_URL")
 
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
