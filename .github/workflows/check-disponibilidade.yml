@@ -13,11 +13,17 @@ jobs:
       - name: Requisição para a API do Sesc
         id: fetch_api
         run: |
-          # Substitua o comando abaixo pelo seu curl real
-          curl -s --request GET \
-            --url 'URL_DA_API_AQUI' \
-            --header 'Accept: application/json' \
-            --output resposta.json
+          curl -s -X GET "https://portalturismoapi.sescgo.com.br/api/v1/reservas/disponibilidade/2026-12-01/2026-12-15/1,1,/null/N/1/1/%7B%7D/%7B%7D?SescUnidade=1&ReservaId=0&regimepensao=CAJ" \
+            -H "accept: application/json, text/javascript, */*; q=0.01" \
+            -H "accept-language: pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7,es;q=0.6" \
+            -H "sec-ch-ua: \"Google Chrome\";v=\"147\", \"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"147\"" \
+            -H "sec-ch-ua-mobile: ?0" \
+            -H "sec-ch-ua-platform: \"Windows\"" \
+            -H "sec-fetch-dest: empty" \
+            -H "sec-fetch-mode: cors" \
+            -H "sec-fetch-site: same-site" \
+            -H "Referer: https://portalturismo.sescgo.com.br/" \
+            -o resposta.json
 
       - name: Analisar retorno e validar vagas
         id: validar_vagas
