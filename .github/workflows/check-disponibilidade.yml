@@ -13,7 +13,7 @@ jobs:
     env:
       # API_URL: "https://portalturismoapi.sescgo.com.br/api/v1/reservas/disponibilidade/2026-12-01/2026-12-07/1,1,/null/N/1/1/%7B%7D/%7B%7D"
       API_URL: "https://portalturismoapi.sescgo.com.br/api/v1/reservas/disponibilidade/2026-08-09/2026-08-15/1,1,/null/N/2/1/%7B%7D/%7B%7D?SescUnidade=2&ReservaId=0&regimepensao=CAJ"
-      QUERY_PARAMS: "SescUnidade=2&ReservaId=0&regimepensao=CAJ"
+      QUERY_PARAMS: "SescUnidade=2&ReservaId=0"
       # QUERY_PARAMS: "SescUnidade=1&ReservaId=0&regimepensao=CAJ"
 
     steps:
